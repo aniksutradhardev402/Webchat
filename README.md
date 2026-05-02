@@ -6,6 +6,9 @@
 live link : [webchat.aniksutradhar.com](https://webchat.aniksutradhar.com)
 
 A high-performance, full-stack real-time messaging application built with **FastAPI**, **Next.js**, and **WebSockets**. Designed for speed, security, and a seamless user experience.
+<img width="1828" height="907" alt="ss3" src="https://github.com/user-attachments/assets/8534d764-97e1-47cc-9202-20413b834400" />
+<img width="1853" height="993" alt="ss1" src="https://github.com/user-attachments/assets/31283cae-57c8-48a2-9de7-50bdfac281c5" />
+<img width="1840" height="977" alt="ss2" src="https://github.com/user-attachments/assets/b44c2763-0015-4d42-8c33-db4b1fec0012" />
 
 ---
 
@@ -15,7 +18,8 @@ A high-performance, full-stack real-time messaging application built with **Fast
 - **Instant Delivery**: Powered by WebSockets for sub-100ms latency.
 - **1:1 & Group Chats**: Seamlessly transition between private conversations and collaborative groups.
 - **Typing Indicators**: Real-time feedback when your contacts are active.
-- **Persistence**: Full message history stored securely and retrieved efficiently.
+- **Persistence**: Full message history stored securely and retrieved effi
+ciently.
 
 ### Secure Authentication
 - **Dedicated Auth Service**: A standalone authentication server for maximum security and modularity.
