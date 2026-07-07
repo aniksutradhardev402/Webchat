@@ -9,10 +9,10 @@ AUTH_API = "http://auth_server:8001/api/auth"
 CHAT_API = "http://localhost:8000/api"
 
 USERS = [
-    {"username": "alice", "email": "alice@test.com", "password": "password123"},
-    {"username": "bob", "email": "bob@test.com", "password": "password123"},
-    {"username": "charlie", "email": "charlie@test.com", "password": "password123"},
-    {"username": "david", "email": "david@test.com", "password": "password123"},
+    {"email": "alice@test.com", "password": "Password123!"},
+    {"email": "bob@test.com", "password": "Password123!"},
+    {"email": "charlie@test.com", "password": "Password123!"},
+    {"email": "david@test.com", "password": "Password123!"},
 ]
 
 async def reset_db():
@@ -30,12 +30,12 @@ async def seed_users():
         for user in USERS:
             try:
                 res = await client.post(f"{AUTH_API}/register", json=user)
-                if res.status_code == 200:
+                if res.status_code == 201:
                     uid = res.json()["id"]
                     user_ids.append(uid)
-                    print(f"    - Registered {user['username']} (ID: {uid})")
+                    print(f"    - Registered {user['email']} (ID: {uid})")
             except Exception as e:
-                print(f"    - Failed to register {user['username']}: {e}")
+                print(f"    - Failed to register {user['email']}: {e}")
     return user_ids
 
 async def seed_chats(user_ids):
@@ -43,7 +43,7 @@ async def seed_chats(user_ids):
     print("[*] Creating initial conversations...")
     async with httpx.AsyncClient() as client:
         # Get Alice's token
-        login = await client.post(f"{AUTH_API}/login", json={"username": "alice", "password": "password123"})
+        login = await client.post(f"{AUTH_API}/login", json={"email": "alice@test.com", "password": "Password123!"})
         token = login.json()["access_token"]
         
         # Alice starts chat with Bob (ID 0 and 1)

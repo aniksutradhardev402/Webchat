@@ -47,7 +47,12 @@ _frontend_url = os.getenv("FRONTEND_URL", "")
 _allowed_origins: list[str] = [
     # Production
     "https://webchat.aniksutradhar.com",
-    # Dev origins — new port scheme (6000/6001/6002)
+    # Dev origins — new port scheme (5000/5001/5002)
+    "http://localhost:5000",
+    "http://localhost:5001",
+    "http://localhost:5002",
+    "http://127.0.0.1:5000",
+    # Legacy dev origins (6000/6001/6002)
     "http://localhost:6000",
     "http://localhost:6001",
     "http://localhost:6002",

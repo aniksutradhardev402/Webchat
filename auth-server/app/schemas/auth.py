@@ -17,7 +17,6 @@ RESERVED_USERNAMES = {
 
 
 class UserCreate(BaseModel):
-    username: str
     email: EmailStr
     password: str
 
@@ -36,27 +35,9 @@ class UserCreate(BaseModel):
             )
         return v
 
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, v: str) -> str:
-        v = v.strip()
-        if len(v) < 3:
-            raise ValueError("Username must be at least 3 characters.")
-        if len(v) > 30:
-            raise ValueError("Username must be 30 characters or fewer.")
-        if not re.match(r'^[a-zA-Z0-9_]+$', v):
-            raise ValueError("Username may only contain letters, numbers, and underscores.")
-        if v.startswith('_') or v.endswith('_'):
-            raise ValueError("Username cannot start or end with an underscore.")
-        if '__' in v:
-            raise ValueError("Username cannot contain consecutive underscores.")
-        if v.lower() in RESERVED_USERNAMES:
-            raise ValueError(f"'{v}' is a reserved username. Please choose another.")
-        return v
-
 
 class UserLogin(BaseModel):
-    username: str
+    email: EmailStr
     password: str
 
 

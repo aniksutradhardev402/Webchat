@@ -7,9 +7,9 @@ import subprocess
 import time
 
 # Configuration for local testing
-AUTH_SERVER_URL = "http://localhost:8001"
-CHAT_SERVER_URL = "http://localhost:8002"
-WS_SERVER_URL = "ws://localhost:8002"
+AUTH_SERVER_URL = "http://localhost:5001"
+CHAT_SERVER_URL = "http://localhost:5002"
+WS_SERVER_URL = "ws://localhost:5002"
 
 def clean_db():
     print("\n[*] --- STEP 0: CLEANING DATABASE ---")
@@ -39,13 +39,13 @@ def check_db_counts(expected_users=0, expected_chats=0, expected_messages=0):
     print("[+] Database state matches expectations!")
 
 async def register_user(client, username):
-    payload = {"username": username, "email": f"{username}@test.com", "password": "password123"}
+    payload = {"email": f"{username}@test.com", "password": "Password123!"}
     resp = await client.post(f"{AUTH_SERVER_URL}/api/auth/register", json=payload)
-    assert resp.status_code == 200, f"Registration failed for {username}: {resp.text}"
+    assert resp.status_code == 201, f"Registration failed for {username}: {resp.text}"
     return resp.json()["id"]
 
 async def login_user(client, username):
-    payload = {"username": username, "password": "password123"}
+    payload = {"email": f"{username}@test.com", "password": "Password123!"}
     resp = await client.post(f"{AUTH_SERVER_URL}/api/auth/login", json=payload)
     assert resp.status_code == 200, f"Login failed for {username}: {resp.text}"
     return resp.json()["access_token"]
@@ -96,28 +96,37 @@ async def main():
 
         # 5. Connect WebSockets for User 1 and User 2 (Direct Chat)
         print(f"\n[*] --- STEP 5: SENDING MESSAGE IN DIRECT CHAT (User 1 -> User 2) ---")
-        ws_url_1 = f"{WS_SERVER_URL}/ws/chat/{direct_chat_id}?token={user_data['user_1']['token']}"
-        ws_url_2 = f"{WS_SERVER_URL}/ws/chat/{direct_chat_id}?token={user_data['user_2']['token']}"
+        ws_url_1 = f"{WS_SERVER_URL}/ws?token={user_data['user_1']['token']}"
+        ws_url_2 = f"{WS_SERVER_URL}/ws?token={user_data['user_2']['token']}"
         
         async with websockets.connect(ws_url_1) as ws1, websockets.connect(ws_url_2) as ws2:
-            msg_payload = {"action": "send_message", "data": {"content": "Hello User 2! This is a private message."}}
+            msg_payload = {"action": "send_message", "data": {"content": "Hello User 2! This is a private message.", "chat_id": direct_chat_id}}
             await ws1.send(json.dumps(msg_payload))
             
             # User 1 receives broadcast
-            resp1 = json.loads(await ws1.recv())
+            while True:
+                resp1 = json.loads(await ws1.recv())
+                if resp1.get("action") == "new_message":
+                    break
             # User 2 receives message
-            resp2 = json.loads(await ws2.recv())
-            print(f"    User 2 received: '{resp2['content']}'")
+            while True:
+                resp2 = json.loads(await ws2.recv())
+                if resp2.get("action") == "new_message":
+                    print(f"    User 2 received: '{resp2['content']}'")
+                    break
 
         # 6. Connect WebSockets for User 3 in Group Chat
         print(f"\n[*] --- STEP 6: SENDING MESSAGE IN GROUP CHAT (User 3 -> All) ---")
-        ws_url_3 = f"{WS_SERVER_URL}/ws/chat/{group_chat_id}?token={user_data['user_3']['token']}"
+        ws_url_3 = f"{WS_SERVER_URL}/ws?token={user_data['user_3']['token']}"
         async with websockets.connect(ws_url_3) as ws3:
-            msg_payload = {"action": "send_message", "data": {"content": "Hey everyone! User 3 here in the group chat."}}
+            msg_payload = {"action": "send_message", "data": {"content": "Hey everyone! User 3 here in the group chat.", "chat_id": group_chat_id}}
             await ws3.send(json.dumps(msg_payload))
             # User 3 receives broadcast
-            resp3 = json.loads(await ws3.recv())
-            print(f"    User 3 sent group message: '{resp3['content']}'")
+            while True:
+                resp3 = json.loads(await ws3.recv())
+                if resp3.get("action") == "new_message":
+                    print(f"    User 3 sent group message: '{resp3['content']}'")
+                    break
 
     # 7. Check Data in DB
     # Expected: 4 users, 2 chats, 2 messages

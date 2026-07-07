@@ -12,25 +12,8 @@ import { Suspense } from "react";
 
 const AUTH_BASE = AUTH_API_URL.replace(/\/api\/?$/, '');
 
-function GoogleButton() {
-  return (
-    <a
-      href={`${AUTH_BASE}/api/auth/oauth/google`}
-      className="flex items-center justify-center gap-3 w-full py-2.5 px-4 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 transition-colors text-sm font-medium"
-    >
-      <svg width="18" height="18" viewBox="0 0 48 48">
-        <path fill="#EA4335" d="M24 9.5c3.1 0 5.9 1.1 8.1 2.9l6-6C34.5 3.1 29.5 1 24 1 14.7 1 6.8 6.7 3.3 14.8l7 5.4C12 13.6 17.5 9.5 24 9.5z"/>
-        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.3 5.7c4.3-4 6.3-9.9 6.3-16.9z"/>
-        <path fill="#FBBC05" d="M10.3 28.8A14.8 14.8 0 0 1 9.5 24c0-1.7.3-3.3.8-4.8L3.3 13.8A23.9 23.9 0 0 0 0 24c0 3.8.9 7.4 2.5 10.5l7.8-5.7z"/>
-        <path fill="#34A853" d="M24 47c5.7 0 10.5-1.9 14-5.1l-7.3-5.7c-1.9 1.3-4.4 2-6.7 2-6.5 0-12-4.1-13.9-9.8l-7.8 5.7C6.7 41.3 14.7 47 24 47z"/>
-      </svg>
-      Continue with Google
-    </a>
-  );
-}
-
 function LoginContent() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notVerifiedEmail, setNotVerifiedEmail] = useState(""); // set when 403 EMAIL_NOT_VERIFIED
@@ -40,8 +23,9 @@ function LoginContent() {
   const { login } = useAuth();
   const params = useSearchParams();
 
-  // Banner shown when redirected from email verification link
+  // Banner shown when redirected from email verification link or registration
   const verified = params.get("verified");
+  const registered = params.get("registered");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +36,7 @@ function LoginContent() {
       const res = await fetch(`${AUTH_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -101,6 +85,14 @@ function LoginContent() {
       <Card className="w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-6 text-center">Welcome Back</h1>
 
+        {/* ── Registered success banner ────────────────────────────────── */}
+        {registered === "true" && (
+          <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 text-green-200 rounded-xl text-sm flex items-start gap-2">
+            <span className="text-base">✅</span>
+            <span>Registration successful! You can now sign in below.</span>
+          </div>
+        )}
+
         {/* ── Verified success banner ──────────────────────────────────── */}
         {(verified === "true" || verified === "already") && (
           <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 text-green-200 rounded-xl text-sm flex items-start gap-2">
@@ -131,18 +123,10 @@ function LoginContent() {
           </div>
         )}
 
-        <GoogleButton />
-
-        <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-xs text-white/30">or</span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
-
         {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/60 text-red-100 rounded-xl text-sm">{error}</div>}
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <Input label="Username" placeholder="johndoe" value={username} onChange={e => setUsername(e.target.value)} required />
+          <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
           <Input label="Password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
           <Button type="submit" className="w-full mt-2" isLoading={isLoading}>Sign In</Button>
         </form>

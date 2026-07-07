@@ -48,36 +48,34 @@ async def _unique_username(db: AsyncSession, base: str) -> str:
 @router.post("/register", status_code=201)
 async def register_user(
     user_in: UserCreate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    # Check for duplicate username or email
-    stmt = select(User).where(
-        (User.username == user_in.username) | (User.email == user_in.email)
-    )
+    # Check for duplicate email
+    stmt = select(User).where(User.email == user_in.email)
     if (await db.execute(stmt)).scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Username or email already registered.")
+        raise HTTPException(status_code=400, detail="Email already registered.")
 
-    # Create user — unverified until email link clicked
+    # Derive unique username from email
+    base = user_in.email.split("@")[0]
+    username = await _unique_username(db, base)
+
+    # Create user — verified by default
     new_user = User(
-        username=user_in.username,
+        username=username,
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
-        is_verified=False,
+        is_verified=True,
     )
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
 
-    # Generate a 24h verification token and send email in the background
-    token = create_verification_token(new_user.id)
-    background_tasks.add_task(
-        send_verification_email, new_user.email, new_user.username, token
-    )
-
     return {
-        "message": "Registration successful! Please check your email to verify your account.",
+        "id": new_user.id,
+        "message": "Registration successful!",
         "email": new_user.email,
+        "access_token": create_access_token(new_user.id),
+        "token_type": "bearer",
     }
 
 
@@ -134,19 +132,19 @@ async def resend_verification(
 
 @router.post("/login", response_model=Token)
 async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)):
-    stmt = select(User).where(User.username == user_in.username)
+    stmt = select(User).where(User.email == user_in.email)
     user = (await db.execute(stmt)).scalar_one_or_none()
 
     if not user or not user.hashed_password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -165,86 +163,3 @@ async def read_current_user(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-# ── Google SSO ────────────────────────────────────────────────────────────────
-
-GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
-GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
-
-
-def _google_redirect_uri() -> str:
-    return f"{os.getenv('AUTH_SERVER_URL', 'http://localhost:6001')}/api/auth/oauth/google/callback"
-
-
-@router.get("/oauth/google")
-async def google_login():
-    if not GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=503, detail="Google SSO is not configured")
-    params = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": _google_redirect_uri(),
-        "response_type": "code",
-        "scope": "openid email profile",
-        "access_type": "offline",
-        "prompt": "select_account",
-    }
-    url = GOOGLE_AUTH_URL + "?" + "&".join(f"{k}={v}" for k, v in params.items())
-    return RedirectResponse(url)
-
-
-@router.get("/oauth/google/callback")
-async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
-    if not GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=503, detail="Google SSO is not configured")
-
-    async with httpx.AsyncClient() as client:
-        token_res = await client.post(GOOGLE_TOKEN_URL, data={
-            "code": code,
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": _google_redirect_uri(),
-            "grant_type": "authorization_code",
-        })
-        if token_res.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to exchange Google code")
-        token_data = token_res.json()
-
-        info_res = await client.get(
-            GOOGLE_USERINFO_URL,
-            headers={"Authorization": f"Bearer {token_data['access_token']}"},
-        )
-        if info_res.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to fetch Google user info")
-        guser = info_res.json()
-
-    google_id = guser["sub"]
-    email = guser["email"]
-    name = guser.get("name", "")
-
-    stmt = select(User).where(User.oauth_provider == "google", User.oauth_id == google_id)
-    user = (await db.execute(stmt)).scalar_one_or_none()
-
-    if not user:
-        stmt2 = select(User).where(User.email == email)
-        user = (await db.execute(stmt2)).scalar_one_or_none()
-        if user:
-            user.oauth_provider = "google"
-            user.oauth_id = google_id
-            user.is_verified = True  # Upgrade existing account to verified via Google
-        else:
-            base = name.replace(" ", "") or email.split("@")[0]
-            username = await _unique_username(db, base)
-            user = User(
-                username=username,
-                email=email,
-                oauth_provider="google",
-                oauth_id=google_id,
-                is_verified=True,   # Google guarantees email ownership
-            )
-            db.add(user)
-
-    await db.commit()
-    await db.refresh(user)
-
-    jwt_token = create_access_token(user.id)
-    return RedirectResponse(f"{FRONTEND_URL}/auth/callback?token={jwt_token}")
